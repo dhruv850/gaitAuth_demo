@@ -75,7 +75,7 @@ public class MainActivity extends FlutterActivity {
 
 
     public void initGaitAuth() {
-        UnifyID.initialize(getApplicationContext(), "https://bbf1f854e859e9f00a1f6e216be39c70@config.unify.id", "flutter_gaithauth_integration", new CompletionHandler() {
+        UnifyID.initialize(getApplicationContext(), "", "", new CompletionHandler() {
             @Override
             public void onCompletion(UnifyIDConfig config) {
                 gaitAuth.initialize(getApplicationContext(), config);   // initializing gaitAuth
