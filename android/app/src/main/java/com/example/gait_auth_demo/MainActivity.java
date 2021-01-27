@@ -3,7 +3,6 @@ package com.example.gait_auth_demo;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
 import android.util.Log;
-import io.flutter.plugins.GeneratedPluginRegistrant;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import androidx.annotation.NonNull;
@@ -11,6 +10,10 @@ import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+
+import io.flutter.plugin.common.MethodCall;
+import io.flutter.plugin.common.MethodChannel;
+
 import id.unify.sdk.core.CompletionHandler;
 import id.unify.sdk.core.UnifyID;
 import id.unify.sdk.core.UnifyIDConfig;
@@ -18,7 +21,6 @@ import id.unify.sdk.core.UnifyIDException;
 import id.unify.sdk.gaitauth.AuthenticationListener;
 import id.unify.sdk.gaitauth.AuthenticationResult;
 import id.unify.sdk.gaitauth.Authenticator;
-import id.unify.sdk.gaitauth.FeatureCollectionException;
 import id.unify.sdk.gaitauth.FeatureEventListener;
 import id.unify.sdk.gaitauth.GaitAuth;
 import id.unify.sdk.gaitauth.GaitAuthException;
@@ -26,41 +28,34 @@ import id.unify.sdk.gaitauth.GaitFeature;
 import id.unify.sdk.gaitauth.GaitModel;
 import id.unify.sdk.gaitauth.GaitModelException;
 import id.unify.sdk.gaitauth.GaitQuantileConfig;
-import id.unify.sdk.gaitauth.GaitScore;
-import id.unify.sdk.gaitauth.OnScoreListener;
-import io.flutter.plugin.common.MethodCall;
-import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugins.GeneratedPluginRegistrant;
 
 public class MainActivity extends FlutterActivity {
-    private static final String CHANNEL = "example.com/demo"; //method channel
-    ArrayList<GaitFeature> featureList;  //arraylist to store features
-    public String modelID; //model list
-    public String gaitModelStatus = "created";
-    public String authStatus = "inconclusive";
-    GaitModel gaitModel;   //global gaitmodel
-    GaitAuth gaitAuth;   // global gaitauth
+    private static final String CHANNEL = "example.com/demo";
+    ArrayList<GaitFeature> featureList;
+    public String modelID;
+    public GaitModel.Status gaitModelStatus = GaitModel.Status.UNKNOWN;
+    public AuthenticationResult.Status authStatus = AuthenticationResult.Status.INCONCLUSIVE;
+    GaitModel gaitModel;
+    GaitAuth gaitAuth;
     Authenticator authenticator;
 
 
     @Override
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
-        GeneratedPluginRegistrant.registerWith(flutterEngine);
-        loadData();             // to load features
-        loadModelId();         // to load existing model ID
-        initGaitAuth();        // initializing gait auth
+        loadData();
+        loadModelId();
+        initGaitAuth();
 
         new MethodChannel(getFlutterEngine().getDartExecutor().getBinaryMessenger(), CHANNEL).setMethodCallHandler(new MethodChannel.MethodCallHandler() {  //platform channel
             @Override
             public void onMethodCall(MethodCall methodCall, MethodChannel.Result result) {
 
                 if (methodCall.method.equals("getMessage")) {
-                    //String message = "Started Feature Collection" ;
-                    if (gaitModelStatus == "READY") {
+                    if (gaitModelStatus == GaitModel.Status.READY) {
                         getAuthStatus();
                     }
-                    if (authStatus == "AUTHENTICATED") {
-                        String textResult = "Your Secret is - asdhfdjghjdnve@#45f";
+                    if (authStatus == AuthenticationResult.Status.AUTHENTICATED) {
+                        String textResult = "Authentication Successful";
                         result.success(textResult);
                     } else {
                         String textResult = "You are not authorised";
@@ -78,15 +73,17 @@ public class MainActivity extends FlutterActivity {
         UnifyID.initialize(getApplicationContext(), "", "", new CompletionHandler() {
             @Override
             public void onCompletion(UnifyIDConfig config) {
-                gaitAuth.initialize(getApplicationContext(), config);   // initializing gaitAuth
+                gaitAuth.initialize(getApplicationContext(), config);
 
                 try {
-                    if (!TextUtils.isEmpty(modelID)) {  //checking if already have modelID stored , if yes then load that model
+                    if (!TextUtils.isEmpty(modelID)) {
+                        //check if we already have modelID stored, if so, use it.
                         loadAndStartAuthenticator();
-                    } else {  // if not model ID, create a new Model
+                    } else {
+                        // if not, create a new Model
                         gaitModel = gaitAuth.getInstance().createModel();
                     }
-                    if (featureList.size() <= 100 && gaitModelStatus != "TRAINING") {
+                    if (featureList.size() <= 100 && gaitModelStatus != GaitModel.Status.TRAINING) {
                         startCollection();
                     }
                 } catch (GaitAuthException e) {
@@ -105,11 +102,10 @@ public class MainActivity extends FlutterActivity {
 
     public void loadAndStartAuthenticator() throws GaitModelException {
         gaitModel = gaitAuth.getInstance().loadModel(modelID);
-        gaitModel.refresh();     //refresh the status only if it is ready, otherwise error
+        gaitModel.refresh();
 
-        gaitModelStatus = gaitModel.getStatus().toString(); // storing the status which can be seen in the screen
-        if (gaitModelStatus == "READY") {         //if only the status is ready go to scores
-            double QUANTILE_THRESHOLD = 0.8; // your desire quantile threshold
+        if (gaitModel.getStatus() == GaitModel.Status.READY) {
+            double QUANTILE_THRESHOLD = 0.8; // your desire quantiled threshold
             GaitQuantileConfig config1 = new GaitQuantileConfig(QUANTILE_THRESHOLD);
             config1.setMinNumScores(5);
             config1.setMaxNumScores(50);
@@ -157,7 +153,7 @@ public class MainActivity extends FlutterActivity {
             public void onComplete(AuthenticationResult authenticationResult) {
                 // Authentication status obtained
                 Log.d("Authentication Result", authenticationResult.getStatus().toString());  // result to string
-                authStatus = authenticationResult.getStatus().toString();
+                authStatus = authenticationResult.getStatus();
             }
 
             @Override
